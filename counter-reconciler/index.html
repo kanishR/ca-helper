@@ -8,12 +8,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Counter Sheet Reconciler</title>
+  <title>Sheet Reconciler</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
-    <h1>Counter Sheet Reconciler</h1>
+    <h1>Sheet Reconciler</h1>
     <p class="note">Your files never leave this computer. Everything runs inside this browser tab.</p>
   </header>
 
@@ -23,7 +23,7 @@
       <label>Quarter <input id="quarter" type="text" placeholder="e.g. Q2 FY 2026-27"></label>
     </section>
 
-    <!-- app.js fills this with one card per counter, copied from the template below. -->
+    <!-- app.js fills this with one card per account, copied from the template below. -->
     <section id="cards" class="cards"></section>
 
     <!-- The row table for whichever "Show rows" button was clicked last. -->
@@ -33,7 +33,7 @@
     </section>
 
     <section class="actions">
-      <button id="add-counter" type="button" class="link">+ Add counter</button>
+      <button id="add-counter" type="button" class="link">+ Add account</button>
       <span class="note">Same rule for cash, UPI, card and bank transfer.</span>
       <button id="submit" type="button" class="primary">Submit</button>
     </section>
@@ -47,10 +47,10 @@
     </section>
   </main>
 
-  <!-- A <template> is not shown. app.js clones it for each counter card. -->
+  <!-- A <template> is not shown. app.js clones it for each account card. -->
   <template id="card-template">
     <article class="card">
-      <input class="name" type="text" aria-label="Counter name">
+      <input class="name" type="text" aria-label="Account name">
       <label class="drop">
         <input class="file" type="file" accept=".xlsx,.xls,.csv">
         <span class="file-label">Choose .xlsx, .xls or .csv</span>
@@ -59,7 +59,7 @@
         <label>Amount column <select class="amount-col"></select></label>
         <span class="info"></span>
       </div>
-      <label class="amount-label">Amount per patient (₹)
+      <label class="amount-label">Amount per row (₹)
         <input class="amount" type="number" min="1" step="0.01" inputmode="decimal">
       </label>
       <div class="alerts"></div>

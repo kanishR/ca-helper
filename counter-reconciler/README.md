@@ -1,12 +1,12 @@
-# Counter Sheet Reconciler
+# Sheet Reconciler
 
-A small web page for a CA. Upload the receipt sheet of each counter of a client (for example Consultation, Lab and Pharmacy of a nursing home), type one **amount per patient** for each counter, and press **Submit**. The page then:
+A small web page for a CA, for any client whose takings are split across several accounts (for example Consultation, Lab and Pharmacy of a nursing home, or the departments of a shop). Upload one sheet per account, type one **amount per row** for each account, and press **Submit**. The page then:
 
 - sets every row of a sheet to that amount (*After*) and keeps the uploaded amount (*Before*),
 - flags rows that still have **amount left** (Before is more than the amount) in amber,
 - flags **short** rows (Before is less than the amount, so the difference is negative) in red,
 - shows those rows in a table with Before, After and Difference when you click **Show rows**,
-- downloads one cleaned Excel file per counter and one combined workbook (Summary, one sheet per counter, Differences).
+- downloads one cleaned Excel file per account and one combined workbook (Summary, one sheet per account, Differences).
 
 The same rule applies to every payment mode: cash, UPI, card and bank transfer.
 
@@ -14,7 +14,7 @@ The same rule applies to every payment mode: cash, UPI, card and bank transfer.
 
 1. Download this repository (green **Code** button, then **Download ZIP**) and unzip it.
 2. Open the `counter-reconciler` folder and double-click `index.html`. It opens in your browser. No internet, no install, no account.
-3. Try it with the three files in `samples/`.
+3. Try it with the two sample clients in `samples/`. [TEST-GUIDE.md](TEST-GUIDE.md) lists the exact results you should see.
 
 Files never leave the computer: the page reads them inside the browser tab and writes the downloads from there.
 
@@ -30,7 +30,7 @@ A web page is plain text files that the browser downloads and runs. There is no 
 | `app.js` | JavaScript | **Behaviour**: reacts to file picks and clicks, calls the rule, draws alerts and tables, makes downloads. |
 | `vendor/xlsx.full.min.js` | JavaScript | **SheetJS**, a library that reads and writes Excel files. Copied in so the page works offline. |
 | `rules.test.js` | JavaScript | Tests for the rule, run with Node. |
-| `samples/` | Excel | Three made-up sheets to try the page with. `make-samples.js` regenerates them. |
+| `samples/` | Excel, CSV | Two made-up clients to test with (see TEST-GUIDE.md). `make-samples.js` regenerates them. |
 
 What happens when you open the page:
 
@@ -40,7 +40,7 @@ What happens when you open the page:
 4. When you pick a file, the browser hands its bytes to `app.js`, SheetJS turns them into rows, and nothing is sent anywhere.
 5. When you click a download button, SheetJS builds an `.xlsx` in memory and the browser saves it.
 
-There is no server and no database. That is deliberate (simple, free, and patient data stays private). A server is only needed later if we want logins, saved clients or payments.
+There is no server and no database. That is deliberate (simple, free, and the client's data stays private). A server is only needed later if we want logins, saved clients or payments.
 
 ## Running the tests
 
@@ -59,6 +59,6 @@ Opening `index.html` from disk is enough for one user. To get a link for the CA 
 
 ## What version 1 does not do yet
 
-- Move the left-over amount onto the other counters' sheets (it is only shown and listed).
+- Move the left-over amount onto the other accounts' sheets (it is only shown and listed).
 - Colour the cells inside the downloaded Excel files (the Flag column says Amount left / Short instead).
 - Read a sheet other than the first one in a workbook.

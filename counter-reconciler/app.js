@@ -6,7 +6,7 @@
 //
 // Two globals come from the scripts loaded before this one:
 //   XLSX  — the SheetJS library (vendor/xlsx.full.min.js): reads and writes Excel
-//   Rules — our per-patient rule (rules.js)
+//   Rules — our per-row rule (rules.js)
 
 const cardsEl = document.getElementById('cards');
 const template = document.getElementById('card-template');
@@ -14,7 +14,7 @@ const messageEl = document.getElementById('message');
 const resultsEl = document.getElementById('results');
 const detailEl = document.getElementById('detail');
 
-// One entry per counter card. Everything the page knows lives here.
+// One entry per account card. Everything the page knows lives here.
 const counters = [];
 
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
@@ -49,8 +49,11 @@ async function readFile(counter) {
   if (!file) return;
   try {
     // The file is read into memory here, inside the browser. Nothing is uploaded.
-    const buffer = await file.arrayBuffer();
-    const book = XLSX.read(buffer, { cellDates: true });
+    // A .csv is plain text: read it as text so the browser decodes UTF-8
+    // (₹ and other non-English characters). Excel files are read as raw bytes.
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+    const data = isCsv ? await file.text() : await file.arrayBuffer();
+    const book = XLSX.read(data, { type: isCsv ? 'string' : 'array', cellDates: true });
     const sheet = book.Sheets[book.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
 
@@ -87,13 +90,13 @@ async function readFile(counter) {
 function submit() {
   hideMessage();
   const used = counters.filter((c) => c.rows || c.amountInput.value);
-  if (used.length === 0) return showMessage('Upload at least one sheet and enter its amount per patient.');
+  if (used.length === 0) return showMessage('Upload at least one sheet and enter its amount per row.');
 
   for (const c of used) {
-    const label = c.nameInput.value || 'a counter';
+    const label = c.nameInput.value || 'an account';
     if (!c.rows) return showMessage(`Choose a file for ${label}.`);
     const amount = Rules.toPaise(c.amountInput.value);
-    if (amount === null || amount <= 0) return showMessage(`Enter an amount per patient above ₹0 for ${label}.`);
+    if (amount === null || amount <= 0) return showMessage(`Enter an amount per row above ₹0 for ${label}.`);
   }
 
   for (const c of used) {
@@ -173,13 +176,13 @@ function rowTable(counter, kind) {
   table.className = 'grid';
   const head = kind === 'skipped'
     ? ['Row no', 'Reason', 'Amount cell']
-    : ['Row no', 'Date', 'Receipt no', 'Patient', 'Mode', 'Before', 'After', 'Difference'];
+    : ['Row no', 'Date', 'Receipt no', 'Name', 'Mode', 'Before', 'After', 'Difference'];
   table.appendChild(tr(head, 'th'));
 
   for (const r of list) {
     const cells = kind === 'skipped'
       ? [r.rowNo, r.reason, showCell(r.cells[Number(counter.amountCol.value)])]
-      : [r.rowNo, pick(r, cols.date), pick(r, cols.receipt), pick(r, cols.patient), pick(r, cols.mode),
+      : [r.rowNo, pick(r, cols.date), pick(r, cols.receipt), pick(r, cols.party), pick(r, cols.mode),
          fmt(r.before), fmt(r.after), signed(r.diff)];
     const row = tr(cells, 'td');
     row.className = kind;
@@ -209,7 +212,7 @@ function showCell(value) {
 function renderSummary(used) {
   const table = document.getElementById('summary');
   table.innerHTML = '';
-  table.appendChild(tr(['Counter', 'Rows', 'Amount per patient', 'Total before', 'Total after', 'Amount left', 'Short'], 'th'));
+  table.appendChild(tr(['Account', 'Rows', 'Amount per row', 'Total before', 'Total after', 'Amount left', 'Short'], 'th'));
   for (const c of used) {
     const s = Rules.summarize(c.results);
     const row = tr([c.nameInput.value, s.rows, fmt(Rules.toPaise(c.amountInput.value)),
@@ -277,7 +280,7 @@ function downloadCombined(used) {
     ['Quarter', document.getElementById('quarter').value],
     ['Run at', new Date().toLocaleString('en-IN')],
     [],
-    ['Counter', 'File', 'Rows', 'Amount per patient (₹)', 'Total before (₹)', 'Total after (₹)', 'Amount left (₹)', 'Short (₹)', 'Skipped rows'],
+    ['Account', 'File', 'Rows', 'Amount per row (₹)', 'Total before (₹)', 'Total after (₹)', 'Amount left (₹)', 'Short (₹)', 'Skipped rows'],
   ];
   for (const c of used) {
     const s = Rules.summarize(c.results);
@@ -288,12 +291,12 @@ function downloadCombined(used) {
 
   for (const c of used) add(cleanedRows(c), c.nameInput.value);
 
-  const diffs = [['Counter', 'Row no', 'Date', 'Receipt no', 'Patient', 'Mode', 'Before (₹)', 'After (₹)', 'Difference (₹)', 'Flag']];
+  const diffs = [['Account', 'Row no', 'Date', 'Receipt no', 'Name', 'Mode', 'Before (₹)', 'After (₹)', 'Difference (₹)', 'Flag']];
   for (const c of used) {
     const at = (r, i) => (i === -1 ? '' : r.cells[i]);
     for (const r of c.results) {
       if (r.flag !== 'left' && r.flag !== 'short') continue;
-      diffs.push([c.nameInput.value, r.rowNo, at(r, c.cols.date), at(r, c.cols.receipt), at(r, c.cols.patient),
+      diffs.push([c.nameInput.value, r.rowNo, at(r, c.cols.date), at(r, c.cols.receipt), at(r, c.cols.party),
         at(r, c.cols.mode), Rules.rupees(r.before), Rules.rupees(r.after), Rules.rupees(r.diff),
         r.flag === 'left' ? 'Amount left' : 'Short']);
     }
@@ -328,9 +331,9 @@ function hideMessage() {
 
 // ---------- start ----------
 
-['Consultation', 'Lab', 'Pharmacy'].forEach(addCard);
+['Account 1', 'Account 2', 'Account 3'].forEach(addCard);
 document.getElementById('add-counter').addEventListener('click', () => {
-  if (counters.length >= 10) return showMessage('Up to 10 counters are supported.');
-  addCard(`Counter ${counters.length + 1}`);
+  if (counters.length >= 10) return showMessage('Up to 10 accounts are supported.');
+  addCard(`Account ${counters.length + 1}`);
 });
 document.getElementById('submit').addEventListener('click', submit);
