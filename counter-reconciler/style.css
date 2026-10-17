@@ -1,0 +1,118 @@
+/* style.css — how the page looks. Only looks: no behaviour lives here. */
+
+:root {
+  --ink: #1f2328;
+  --quiet: #59636e;
+  --line: #d0d7de;
+  --bg: #f6f8fa;
+  --card: #ffffff;
+  --accent: #0969da;
+  --left: #fff4d6;      /* amber: amount left */
+  --left-edge: #d4a72c;
+  --short: #ffe3e3;     /* red: short */
+  --short-edge: #cf222e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+header, main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+h1 { margin: 8px 0 4px; font-size: 24px; }
+h2 { font-size: 18px; }
+.note { color: var(--quiet); margin: 0; font-size: 13px; }
+
+input, select, button { font: inherit; }
+input[type="text"], input[type="number"], select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.fields { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+.fields label, .amount-label, .columns label { display: block; font-size: 13px; color: var(--quiet); }
+
+/* Cards sit side by side and wrap onto new lines on narrow screens. */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card .name { font-weight: 600; font-size: 16px; border-color: transparent; padding-left: 0; }
+.card .name:focus { border-color: var(--line); padding-left: 10px; }
+
+.drop {
+  display: block;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+}
+.drop input { display: none; }   /* the label itself is the click target */
+.drop.has-file { border-style: solid; }
+.info { display: block; color: var(--quiet); font-size: 13px; margin-top: 4px; }
+
+.alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.alert.left { background: var(--left); border: 1px solid var(--left-edge); }
+.alert.short { background: var(--short); border: 1px solid var(--short-edge); }
+.alert.calm { border: 1px dashed var(--line); color: var(--quiet); justify-content: center; }
+.alert button { white-space: nowrap; border: 0; background: none; font-weight: 600; cursor: pointer; color: var(--ink); }
+
+.actions { display: flex; align-items: center; gap: 16px; margin: 16px 0; flex-wrap: wrap; }
+.actions .note { flex: 1; }
+button.link { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; }
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 28px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.secondary {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.message { padding: 10px 12px; border-radius: 6px; background: var(--short); border: 1px solid var(--short-edge); }
+
+/* Tables: scroll sideways inside their box instead of stretching the page. */
+.rows { overflow-x: auto; }
+table.grid { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; }
+.grid th, .grid td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; white-space: nowrap; }
+.grid th { background: var(--bg); }
+.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.grid tr.left td { background: var(--left); }
+.grid tr.short td { background: var(--short); }
+
+.downloads { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 40px; }
+
+@media (max-width: 600px) {
+  .fields { grid-template-columns: 1fr; }
+}
