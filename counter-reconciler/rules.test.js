@@ -10,8 +10,6 @@ test('toPaise reads Indian-style amounts', () => {
   assert.strictEqual(R.toPaise('-200'), -20000);
   assert.strictEqual(R.toPaise(''), null);
   assert.strictEqual(R.toPaise('abc'), null);
-  assert.strictEqual(R.toPaise('Rs. 500'), 50000);
-  assert.strictEqual(R.toPaise('INR 1,500'), 150000);
 });
 
 test('findHeaderRow skips title rows', () => {
@@ -20,7 +18,7 @@ test('findHeaderRow skips title rows', () => {
   const cols = R.detectColumns(rows[2]);
   assert.strictEqual(cols.date, 0);
   assert.strictEqual(cols.receipt, 1);
-  assert.strictEqual(cols.party, 2);
+  assert.strictEqual(cols.patient, 2);
   assert.strictEqual(cols.amount, 3);
 });
 

@@ -1,4 +1,4 @@
-// rules.js — the per-row rule, with no browser code in it.
+// rules.js — the per-patient rule, with no browser code in it.
 //
 // Everything here is a plain function: data in, data out. No DOM, no files.
 // That keeps the business rule easy to read and easy to test with Node
@@ -11,7 +11,7 @@ const HEADER_WORDS = {
   date: ['date', 'bill date', 'receipt date', 'vch date', 'voucher date'],
   amount: ['amount', 'total', 'net amount', 'received', 'credit', 'amt'],
   receipt: ['bill no', 'receipt no', 'voucher no', 'vch no', 'bill', 'receipt'],
-  party: ['name', 'party', 'customer', 'patient', 'client', 'particulars', 'party name'],
+  patient: ['patient', 'name', 'party', 'particulars', 'patient name'],
   mode: ['mode', 'payment mode', 'pay mode', 'cash/upi'],
 };
 
@@ -22,7 +22,7 @@ function clean(text) {
 // "₹1,25,000.50" -> 12500050. Returns null when the cell is not a number.
 function toPaise(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value * 100) : null;
-  const text = String(value ?? '').replace(/[₹,\s]/g, '').replace(/^(rs\.?|inr)/i, '');
+  const text = String(value ?? '').replace(/[₹,\s]/g, '').replace(/^rs\.?/i, '');
   if (text === '' || !/^-?\d+(\.\d+)?$/.test(text)) return null;
   return Math.round(parseFloat(text) * 100);
 }
@@ -53,17 +53,17 @@ function findHeaderRow(rows) {
   return 0;
 }
 
-// Apply one amount per row to every data row of one sheet.
+// Apply one per-patient amount to every data row of one sheet.
 //   rows:      the sheet as a 2-D array (rows of cells), header included
 //   headerRow: index of the header row
 //   amountCol: index of the amount column
-//   perRowPaise: the CA's number for this account, in paise
+//   perPatientPaise: the CA's number for this counter, in paise
 // Each data row gets before / after / difference and a flag:
-//   'left'    before > amount per row (money left on the row)
-//   'short'   before < amount per row (negative difference)
+//   'left'    before > per-patient amount (money left on the row)
+//   'short'   before < per-patient amount (negative difference)
 //   'ok'      exactly equal
 //   'skipped' blank, text or a total line; left out of every total
-function applyRule(rows, headerRow, amountCol, perRowPaise) {
+function applyRule(rows, headerRow, amountCol, perPatientPaise) {
   const results = [];
   for (let i = headerRow + 1; i < rows.length; i++) {
     const row = rows[i] || [];
@@ -78,7 +78,7 @@ function applyRule(rows, headerRow, amountCol, perRowPaise) {
       continue;
     }
 
-    const after = perRowPaise;
+    const after = perPatientPaise;
     const diff = before - after;
     const flag = diff > 0 ? 'left' : diff < 0 ? 'short' : 'ok';
     results.push({ index: i, rowNo: i + 1, cells: row, before, after, diff, flag });
