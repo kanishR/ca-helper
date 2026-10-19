@@ -19,7 +19,7 @@
 
   <main>
     <section class="fields">
-      <label>Client <input id="client" type="text" placeholder="e.g. City Nursing Home"></label>
+      <label>Client <input id="client" type="text" placeholder="e.g. Sharma Nursing Home"></label>
       <label>Quarter <input id="quarter" type="text" placeholder="e.g. Q2 FY 2026-27"></label>
     </section>
 
@@ -50,16 +50,17 @@
   <!-- A <template> is not shown. app.js clones it for each counter card. -->
   <template id="card-template">
     <article class="card">
-      <input class="name" type="text" aria-label="Counter name">
+      <input class="name" type="text" aria-label="Counter name" placeholder="Counter name, e.g. Pharmacy">
       <label class="drop">
         <input class="file" type="file" accept=".xlsx,.xls,.csv">
         <span class="file-label">Choose .xlsx, .xls or .csv</span>
       </label>
       <div class="columns" hidden>
         <label>Amount column <select class="amount-col"></select></label>
+        <label>Bill no column <select class="bill-col"></select></label>
         <span class="info"></span>
       </div>
-      <label class="amount-label">Amount per patient (₹)
+      <label class="amount-label">Amount per row (₹)
         <input class="amount" type="number" min="1" step="0.01" inputmode="decimal">
       </label>
       <div class="alerts"></div>

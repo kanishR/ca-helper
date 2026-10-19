@@ -6,4 +6,4 @@ Each tool is its own folder of plain HTML, CSS and JavaScript. There is no serve
 
 | Tool | What it does |
 | --- | --- |
-| [counter-reconciler](counter-reconciler/) | Applies one amount per patient to every row of each counter's sheet (Consultation, Lab, Pharmacy), flags rows with amount left or short, and downloads cleaned sheets plus a combined workbook. |
+| [counter-reconciler](counter-reconciler/) | Applies one amount per row to every row of each counter's sheet (any client: a nursing home's Consultation / Lab / Pharmacy, a coaching class's Fees / Books, ...), flags rows with amount left or short, and downloads cleaned sheets plus a combined workbook. |

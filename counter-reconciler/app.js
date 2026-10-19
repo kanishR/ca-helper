@@ -6,7 +6,7 @@
 //
 // Two globals come from the scripts loaded before this one:
 //   XLSX  — the SheetJS library (vendor/xlsx.full.min.js): reads and writes Excel
-//   Rules — our per-patient rule (rules.js)
+//   Rules — our per-row rule (rules.js)
 
 const cardsEl = document.getElementById('cards');
 const template = document.getElementById('card-template');
@@ -32,6 +32,7 @@ function addCard(name) {
     fileInput: el.querySelector('.file'),
     amountInput: el.querySelector('.amount'),
     amountCol: el.querySelector('.amount-col'),
+    billCol: el.querySelector('.bill-col'),
     rows: null,      // the sheet as a 2-D array, once a file is read
     headerRow: 0,
     cols: null,      // detected column positions
@@ -60,14 +61,18 @@ async function readFile(counter) {
     counter.cols = Rules.detectColumns(rows[counter.headerRow] || []);
     counter.results = null;
 
-    // Fill the "Amount column" dropdown with this sheet's headers.
+    // Fill the "Amount column" and "Bill no column" dropdowns with this sheet's headers.
     const headers = rows[counter.headerRow] || [];
     counter.amountCol.innerHTML = '';
+    counter.billCol.innerHTML = '';
+    counter.billCol.appendChild(new Option('(none: do not match bills)', -1));
     headers.forEach((h, i) => {
-      const option = new Option(String(h || `Column ${i + 1}`), i);
-      counter.amountCol.appendChild(option);
+      const label = String(h || `Column ${i + 1}`);
+      counter.amountCol.appendChild(new Option(label, i));
+      counter.billCol.appendChild(new Option(label, i));
     });
     if (counter.cols.amount !== -1) counter.amountCol.value = counter.cols.amount;
+    counter.billCol.value = counter.cols.bill;
 
     const dataRows = rows.length - counter.headerRow - 1;
     counter.el.querySelector('.drop').classList.add('has-file');
@@ -87,20 +92,29 @@ async function readFile(counter) {
 function submit() {
   hideMessage();
   const used = counters.filter((c) => c.rows || c.amountInput.value);
-  if (used.length === 0) return showMessage('Upload at least one sheet and enter its amount per patient.');
+  if (used.length === 0) return showMessage('Upload at least one sheet and enter its amount per row.');
 
   for (const c of used) {
     const label = c.nameInput.value || 'a counter';
     if (!c.rows) return showMessage(`Choose a file for ${label}.`);
     const amount = Rules.toPaise(c.amountInput.value);
-    if (amount === null || amount <= 0) return showMessage(`Enter an amount per patient above ₹0 for ${label}.`);
+    if (amount === null || amount <= 0) return showMessage(`Enter an amount per row above ₹0 for ${label}.`);
   }
 
   for (const c of used) {
     const amount = Rules.toPaise(c.amountInput.value);
     c.results = Rules.applyRule(c.rows, c.headerRow, Number(c.amountCol.value), amount);
-    renderAlerts(c);
   }
+  // Same bill number on different counters = same patient / customer: move money between them.
+  Rules.reconcileBills(used.map((c) => ({
+    name: c.nameInput.value,
+    results: c.results,
+    perRowPaise: Rules.toPaise(c.amountInput.value),
+    billCol: Number(c.billCol.value),
+    nameCol: c.cols.name,
+    width: (c.rows[c.headerRow] || []).length,
+  })));
+  used.forEach(renderAlerts);
   renderSummary(used);
 }
 
@@ -116,6 +130,10 @@ function renderAlerts(counter) {
     `${s.leftRows} ${s.leftRows === 1 ? 'row has' : 'rows have'} amount left · ${fmt(s.leftTotal)}`, 'No rows with amount left'));
   box.appendChild(alertLine(counter, 'short', s.shortRows,
     `${s.shortRows} ${s.shortRows === 1 ? 'row is' : 'rows are'} short · ${fmt(-s.shortTotal)}`, 'No short rows'));
+  if (s.added > 0) {
+    box.appendChild(alertLine(counter, 'added', s.added,
+      `${s.added} new ${s.added === 1 ? 'row' : 'rows'} added for bills paid at other counters`, ''));
+  }
   if (s.skipped > 0) {
     box.appendChild(alertLine(counter, 'skipped', s.skipped, `${s.skipped} ${s.skipped === 1 ? "row" : "rows"} skipped (blank, text or total line)`, ''));
   }
@@ -146,7 +164,7 @@ function toggleRows(counter, kind, button) {
   closeDetail();
   if (wasOpen) return;
 
-  const titles = { left: 'rows with amount left', short: 'short rows', skipped: 'skipped rows' };
+  const titles = { left: 'rows with amount left', short: 'short rows', skipped: 'skipped rows', added: 'new rows' };
   document.getElementById('detail-title').textContent = `${counter.nameInput.value}: ${titles[kind]}`;
   document.getElementById('detail-table').appendChild(rowTable(counter, kind));
   detailEl.dataset.showing = key;
@@ -164,26 +182,27 @@ function closeDetail() {
 
 function rowTable(counter, kind) {
   const { cols } = counter;
+  const billCol = Number(counter.billCol.value);
   const pick = (r, i) => (i === -1 ? '' : showCell(r.cells[i]));
   const list = counter.results
-    .filter((r) => r.flag === kind)
+    .filter((r) => (kind === 'added' ? r.added : r.flag === kind))
     .sort((a, b) => Math.abs(b.diff || 0) - Math.abs(a.diff || 0));
 
   const table = document.createElement('table');
   table.className = 'grid';
   const head = kind === 'skipped'
     ? ['Row no', 'Reason', 'Amount cell']
-    : ['Row no', 'Date', 'Receipt no', 'Patient', 'Mode', 'Before', 'After', 'Difference'];
+    : ['Row no', 'Date', 'Bill no', 'Name / Party', 'Mode', 'Before', 'Moved', 'After', 'Difference', 'Note'];
   table.appendChild(tr(head, 'th'));
 
   for (const r of list) {
     const cells = kind === 'skipped'
       ? [r.rowNo, r.reason, showCell(r.cells[Number(counter.amountCol.value)])]
-      : [r.rowNo, pick(r, cols.date), pick(r, cols.receipt), pick(r, cols.patient), pick(r, cols.mode),
-         fmt(r.before), fmt(r.after), signed(r.diff)];
+      : [r.rowNo, pick(r, cols.date), pick(r, billCol), pick(r, cols.name), pick(r, cols.mode),
+         fmt(r.before), r.moved ? signed(r.moved) : '', fmt(r.after), signed(r.diff), r.note || ''];
     const row = tr(cells, 'td');
-    row.className = kind;
-    if (kind !== 'skipped') [5, 6, 7].forEach((i) => row.children[i].classList.add('num'));
+    row.className = r.flag;
+    if (kind !== 'skipped') [5, 6, 7, 8].forEach((i) => row.children[i].classList.add('num'));
     table.appendChild(row);
   }
   return table;
@@ -209,12 +228,12 @@ function showCell(value) {
 function renderSummary(used) {
   const table = document.getElementById('summary');
   table.innerHTML = '';
-  table.appendChild(tr(['Counter', 'Rows', 'Amount per patient', 'Total before', 'Total after', 'Amount left', 'Short'], 'th'));
+  table.appendChild(tr(['Counter', 'Rows', 'New rows', 'Amount per row', 'Total before', 'Moved in / out', 'Total after', 'Amount left', 'Short'], 'th'));
   for (const c of used) {
     const s = Rules.summarize(c.results);
-    const row = tr([c.nameInput.value, s.rows, fmt(Rules.toPaise(c.amountInput.value)),
-      fmt(s.before), fmt(s.after), fmt(s.leftTotal), fmt(-s.shortTotal)], 'td');
-    [1, 2, 3, 4, 5, 6].forEach((i) => row.children[i].classList.add('num'));
+    const row = tr([c.nameInput.value, s.rows, s.added, fmt(Rules.toPaise(c.amountInput.value)),
+      fmt(s.before), signed(s.moved), fmt(s.after), fmt(s.leftTotal), fmt(Math.abs(s.shortTotal))], 'td');
+    [1, 2, 3, 4, 5, 6, 7, 8].forEach((i) => row.children[i].classList.add('num'));
     table.appendChild(row);
   }
 
@@ -236,25 +255,51 @@ function button(text, onClick, style = 'secondary') {
   return b;
 }
 
-// The cleaned sheet: every original row and column, plus Before / After /
-// Difference / Flag, and a total line at the bottom.
+// The cleaned sheet: every original row and column, with the amount column
+// overwritten by the new per-row amount and the sheet's own Total lines
+// updated to the new sum. New rows for bills paid at other counters go just
+// above the Total line. Before / Moved / Difference / Flag / Note are added
+// on the right so the original amount stays visible. A Total line is added
+// only if the sheet had none.
 function cleanedRows(counter) {
-  const header = [...(counter.rows[counter.headerRow] || []), 'Before (₹)', 'After (₹)', 'Difference (₹)', 'Flag'];
+  const amountCol = Number(counter.amountCol.value);
+  const header = [...(counter.rows[counter.headerRow] || []), 'Before (₹)', 'Moved (₹)', 'Difference (₹)', 'Flag', 'Note'];
   const out = [header];
   const width = (counter.rows[counter.headerRow] || []).length;
   const pad = (cells) => [...cells, ...Array(Math.max(0, width - cells.length)).fill('')];
-  const labels = { left: 'Amount left', short: 'Short', ok: '', skipped: 'Skipped' };
+  const money = (t) => [Rules.rupees(t.before), Rules.rupees(t.moved), Rules.rupees(t.before + t.moved - t.after)];
+  // A Total line sums the rows since the previous Total line; a Grand Total sums everything above it.
+  const zero = () => ({ before: 0, moved: 0, after: 0 });
+  let since = zero();
+  const all = zero();
+  let hadTotal = false;
   for (const r of counter.results) {
-    if (r.flag === 'skipped') {
-      out.push([...pad(r.cells), '', '', '', `Skipped: ${r.reason}`]);
+    const cells = pad(r.cells);
+    if (r.reason === 'Total line') {
+      const sum = /grand/i.test(r.cells.join(' ')) ? all : since;
+      cells[amountCol] = Rules.rupees(sum.after);
+      out.push([...cells, ...money(sum), 'Total (updated)', '']);
+      since = zero();
+      hadTotal = true;
+    } else if (r.flag === 'skipped') {
+      out.push([...cells, '', '', '', `Skipped: ${r.reason}`, '']);
     } else {
-      out.push([...pad(r.cells), Rules.rupees(r.before), Rules.rupees(r.after), Rules.rupees(r.diff), labels[r.flag]]);
+      cells[amountCol] = Rules.rupees(r.after);
+      out.push([...cells, Rules.rupees(r.before), Rules.rupees(r.moved), Rules.rupees(r.diff), flagLabel(r), r.note || '']);
+      for (const t of [since, all]) { t.before += r.before; t.moved += r.moved; t.after += r.after; }
     }
   }
-  const s = Rules.summarize(counter.results);
-  out.push([]);
-  out.push([...Array(width).fill(''), Rules.rupees(s.before), Rules.rupees(s.after), Rules.rupees(s.before - s.after), 'Total']);
+  if (!hadTotal) {
+    const cells = Array(width).fill('');
+    cells[amountCol] = Rules.rupees(all.after);
+    out.push([], [...cells, ...money(all), 'Total', '']);
+  }
   return out;
+}
+
+function flagLabel(r) {
+  const labels = { left: 'Amount left', short: 'Short', ok: '' };
+  return [r.added ? 'New row' : '', labels[r.flag]].filter(Boolean).join(' · ');
 }
 
 function downloadOne(counter) {
@@ -277,25 +322,26 @@ function downloadCombined(used) {
     ['Quarter', document.getElementById('quarter').value],
     ['Run at', new Date().toLocaleString('en-IN')],
     [],
-    ['Counter', 'File', 'Rows', 'Amount per patient (₹)', 'Total before (₹)', 'Total after (₹)', 'Amount left (₹)', 'Short (₹)', 'Skipped rows'],
+    ['Counter', 'File', 'Rows', 'New rows', 'Amount per row (₹)', 'Total before (₹)', 'Moved in / out (₹)', 'Total after (₹)', 'Amount left (₹)', 'Short (₹)', 'Skipped rows'],
   ];
   for (const c of used) {
     const s = Rules.summarize(c.results);
-    summary.push([c.nameInput.value, c.fileName, s.rows, Number(c.amountInput.value), Rules.rupees(s.before),
-      Rules.rupees(s.after), Rules.rupees(s.leftTotal), Rules.rupees(s.shortTotal), s.skipped]);
+    summary.push([c.nameInput.value, c.fileName, s.rows, s.added, Number(c.amountInput.value), Rules.rupees(s.before),
+      Rules.rupees(s.moved), Rules.rupees(s.after), Rules.rupees(s.leftTotal), Rules.rupees(s.shortTotal), s.skipped]);
   }
   add(summary, 'Summary');
 
   for (const c of used) add(cleanedRows(c), c.nameInput.value);
 
-  const diffs = [['Counter', 'Row no', 'Date', 'Receipt no', 'Patient', 'Mode', 'Before (₹)', 'After (₹)', 'Difference (₹)', 'Flag']];
+  // Every row that is not simply "paid exactly the amount": left, short, moved or new.
+  const diffs = [['Counter', 'Row no', 'Date', 'Bill no', 'Name / Party', 'Mode', 'Before (₹)', 'Moved (₹)', 'After (₹)', 'Difference (₹)', 'Flag', 'Note']];
   for (const c of used) {
     const at = (r, i) => (i === -1 ? '' : r.cells[i]);
     for (const r of c.results) {
-      if (r.flag !== 'left' && r.flag !== 'short') continue;
-      diffs.push([c.nameInput.value, r.rowNo, at(r, c.cols.date), at(r, c.cols.receipt), at(r, c.cols.patient),
-        at(r, c.cols.mode), Rules.rupees(r.before), Rules.rupees(r.after), Rules.rupees(r.diff),
-        r.flag === 'left' ? 'Amount left' : 'Short']);
+      if (r.flag === 'skipped' || (r.flag === 'ok' && !r.moved)) continue;
+      diffs.push([c.nameInput.value, r.rowNo, at(r, c.cols.date), at(r, Number(c.billCol.value)), at(r, c.cols.name),
+        at(r, c.cols.mode), Rules.rupees(r.before), Rules.rupees(r.moved), Rules.rupees(r.after), Rules.rupees(r.diff),
+        flagLabel(r), r.note || '']);
     }
   }
   add(diffs, 'Differences');
@@ -328,7 +374,7 @@ function hideMessage() {
 
 // ---------- start ----------
 
-['Consultation', 'Lab', 'Pharmacy'].forEach(addCard);
+['Counter 1', 'Counter 2', 'Counter 3'].forEach(addCard);
 document.getElementById('add-counter').addEventListener('click', () => {
   if (counters.length >= 10) return showMessage('Up to 10 counters are supported.');
   addCard(`Counter ${counters.length + 1}`);
